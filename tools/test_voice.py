@@ -51,6 +51,10 @@ def luna_send(ui_locale):
 PACTL = ("#!/bin/sh\n"
          "case \"$*\" in *'list sources short'*) printf '3\\talsa_input.usb-Fake_Mic-00.analog-mono\\tmodule-alsa-card.c\\ts16le 1ch 48000Hz\\tRUNNING\\n' ;; esac\n"
          "exit 0\n")
+# BusyBox timeout on the user-tested TV rejects GNU's `-t`; record what the daemon asks for, then succeed at once.
+TIMEOUT = ("#!/bin/sh\n"
+           "printf '%s\\n' \"$*\" >> \"$LGTV_HARNESS_DIR/tmp/timeout.log\"\n"
+           "exit 0\n")
 # 16 kHz s16le mono in real time: sample n has the value n mod 65536, so loss, reordering or corruption shows
 PAREC = ("#!/bin/sh\n"
          "exec python3 -u -c '\n"
@@ -65,6 +69,14 @@ PAREC = ("#!/bin/sh\n"
 def luna_log(d):
     try:
         with open(os.path.join(d.dir, "tmp", "luna.log"), encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def timeout_log(d):
+    try:
+        with open(os.path.join(d.dir, "tmp", "timeout.log"), encoding="utf-8") as f:
             return f.read()
     except OSError:
         return ""
@@ -120,7 +132,8 @@ async def session_suite(encryption):
         settings["api_key"] = base64.b64encode(os.urandom(32)).decode()      # as provisioned by Home Assistant
     else:
         settings["encryption"] = False
-    with DaemonHarness(settings=settings, fakes={"luna-send": luna_send("pl-PL"), "pactl": PACTL, "parec": PAREC}) as d:
+    with DaemonHarness(settings=settings, fakes={"luna-send": luna_send("pl-PL"), "pactl": PACTL, "parec": PAREC,
+                                                 "timeout": TIMEOUT}) as d:
         client = APIClient("127.0.0.1", d.port, None, noise_psk=d.key if encryption else None, expected_name=NAME)
         await asyncio.wait_for(client.connect(login=True), 15)
         check(label + ": status file says encryption %s" % encryption, d.status().get("encryption") is encryption)
@@ -155,6 +168,12 @@ async def session_suite(encryption):
         fin = await client.send_voice_assistant_announcement_await_response("http://127.0.0.1:9/tts.mp3", 10, "Kolacja gotowa")
         check(label + ": announcement finished with success", fin.success is True, fin)
         check(label + ": announcement text is shown", "Kolacja gotowa" in luna_log(d))
+        # playUrls must call BusyBox-compatible `timeout SECONDS` (GNU's `-t` is unavailable on the tested TV)
+        check(label + ": MP3 playback uses BusyBox-compatible timeout", "120 mpg123 " in timeout_log(d), timeout_log(d))
+        fin = await client.send_voice_assistant_announcement_await_response("http://127.0.0.1:9/tts.wav", 10, "Kolacja gotowa")
+        check(label + ": WAV announcement finished with success", fin.success is True, fin)
+        check(label + ": other formats use BusyBox-compatible timeout", "120 gst-play-1.0 " in timeout_log(d), timeout_log(d))
+        check(label + ": no GNU-only timeout option", "-t " not in timeout_log(d), timeout_log(d))
 
         # language picked in the app (settings.json) applies without a restart
         s = d.read_settings(); s["lang"] = "de"

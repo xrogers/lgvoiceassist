@@ -248,8 +248,8 @@ function playNext() {
   }
   var scale = player.muted ? 0 : Math.round(32768 * player.volume);
   var p = /\.mp3(\?|$)/i.test(url) || !/\.(flac|wav|ogg|opus)(\?|$)/i.test(url)
-    ? spawnClean('timeout', ['-t', '120', 'mpg123', '-q', '-f', String(scale), url], { stdio: 'ignore' })
-    : spawnClean('timeout', ['-t', '120', 'gst-play-1.0', '-q', '--volume=' + (player.muted ? 0 : player.volume), url], { stdio: 'ignore' });
+    ? spawnClean('timeout', ['120', 'mpg123', '-q', '-f', String(scale), url], { stdio: 'ignore' })
+    : spawnClean('timeout', ['120', 'gst-play-1.0', '-q', '--volume=' + (player.muted ? 0 : player.volume), url], { stdio: 'ignore' });
   player.proc = p;
   p.on('error', function () {});
   p.on('exit', function () { if (player.proc === p) playNext(); });

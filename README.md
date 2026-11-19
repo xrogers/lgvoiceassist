@@ -10,6 +10,10 @@ The app, its toasts on the TV and the entity names follow the TV menu language: 
 
 Tested on: LG OLED55CX (webOS 5.6.2, root via Homebrew Channel), Magic Remote MR20 (BLE), HA 2026.11.
 
+User-tested: **LG 65QNED80SRA** (2023 QNED; TV reports software version **10.3.2**, root via Homebrew
+Channel), Magic Remote push-to-talk, Home Assistant 2026.11.2. This is a single user report; it is not a claim
+that all QNED models or all devices reporting 10.3.2 work.
+
 ![The app on the TV](docs/screenshots/app-running.png)
 
 ## Requirements
@@ -18,8 +22,9 @@ Tested on: LG OLED55CX (webOS 5.6.2, root via Homebrew Channel), Magic Remote MR
   required (developer mode is not enough): the app takes over LG's voice service. Homebrew Channel → Settings must
   show *Root status: ok*. To root a TV, see [webosbrew.org/rooting](https://www.webosbrew.org/rooting/). Which
   method works depends on the TV's firmware.
-- Only webOS 5 (LG CX, 2020) has been tested. Other webOS versions with Homebrew Channel will probably work, but
-  that is not verified.
+- webOS 5 (LG CX, 2020) and the user-tested LG 65QNED80SRA (reported software version 10.3.2) have been tried.
+  Other webOS versions with Homebrew Channel will probably work, but that is not verified, and compatibility
+  should not be assumed for every QNED or 10.3.2 device.
 - For **push-to-talk:** a Magic Remote with a microphone button.
 - For **hands-free** (wake word): a USB microphone plugged into the TV (any USB audio class device, e.g. a cheap
   C-Media dongle). The CX has no far-field microphone of its own.
@@ -239,6 +244,8 @@ Builds are reproducible: the commit time is used as the timestamp of every archi
 ## Notes
 - Children are started through `spawnClean` (closes inherited fds); otherwise a lingering child keeps the luna hub
   socket and the voiceconductor name stays "already exists" after a restart.
+- Audio playback uses `timeout 120 …`, which both BusyBox and GNU coreutils accept. The BusyBox 1.35 on the
+  user-tested TV rejects GNU's `timeout -t`, which would make TTS, announcements and media URLs silent.
 - Turning the app off (or uninstalling it and rebooting) gives the mic button back to LG's assistant.
 - Data/settings: `/media/developer/lgtv-assist/` (`settings.json`, `disabled` flag). Logs: `/tmp/lgtv-assist.log`.
 - Remote protocol (MR20, BLE, `hidraw` only while awake): voice report `0xFE`, 124 B = `FE seq 80 8B` + 2 × (`01 H2` + 57 B mSBC + pad).
